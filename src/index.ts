@@ -2,7 +2,7 @@ import axios, { isAxiosError } from 'axios';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import express from 'express';
-import { isArray, isEmpty, round, take, toInteger } from 'lodash';
+import { isArray, isEmpty, round, startCase, take, toInteger } from 'lodash';
 import NodeCache from 'node-cache';
 
 const cache = new NodeCache();
@@ -159,7 +159,7 @@ app.get('/departures/:stationCode', async (req, res) => {
         // Type and number, e.g., "REG 12345"
         type: train.compNumeroTreno.replace('REG', 'R'),
         // Final destination of the train, remove Centrale, format nicely
-        destination: train.destinazione.split(' ')[0],
+        destination: startCase(train.destinazione.toLowerCase()).split(' ')[0],
         // Scheduled departure time, formatted as "HH:mm"
         departureTime: formatTime(train.orarioPartenza),
         // Current delay in minutes
