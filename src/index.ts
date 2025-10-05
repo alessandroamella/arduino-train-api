@@ -151,7 +151,6 @@ app.get('/departures/:stationCode', checkApiKey, async (req, res) => {
   // Check cache first (1 minute TTL)
   const cacheKey = `departures_${stationCode}`;
   const cachedDepartures = cache.get<{
-    time: string | null;
     weather: { temperature: string };
     departures: Departure[];
   }>(cacheKey);
@@ -160,6 +159,7 @@ app.get('/departures/:stationCode', checkApiKey, async (req, res) => {
     console.log(`Using cached departures for station: ${stationCode}`);
     // Apply limit if specified
     return res.status(200).json({
+      time: formatTime(Date.now(), true),
       ...cachedDepartures,
       departures:
         maxResults > 0
@@ -206,9 +206,8 @@ app.get('/departures/:stationCode', checkApiKey, async (req, res) => {
         ).toString(),
       }));
 
-    // Prepare response with full data
+    // Prepare response with full data (without time, which will be added fresh)
     const response = {
-      time: formatTime(Date.now(), true),
       weather: await getWeather('Bologna'),
       departures: simplifiedTrains,
     };
@@ -219,6 +218,7 @@ app.get('/departures/:stationCode', checkApiKey, async (req, res) => {
 
     // Apply limit if specified and send response
     return res.status(200).json({
+      time: formatTime(Date.now(), true), // Always use current time
       ...response,
       departures:
         maxResults > 0 ? take(simplifiedTrains, maxResults) : simplifiedTrains,
