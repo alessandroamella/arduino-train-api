@@ -189,7 +189,7 @@ app.get('/departures/:stationCode', async (req, res) => {
         // Scheduled departure time, formatted as "HH:mm"
         departureTime: formatTime(train.orarioPartenza),
         // Current delay in minutes
-        delay: (train.ritardo > 0
+        delay: (train.ritardo >= 0
           ? `+${train.ritardo}`
           : train.ritardo
         ).toString(),
