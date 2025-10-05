@@ -157,7 +157,7 @@ app.get('/departures/:stationCode', async (req, res) => {
       )
       .map((train) => ({
         // Type and number, e.g., "REG 12345"
-        type: train.compNumeroTreno,
+        type: train.compNumeroTreno.replace('REG', 'R'),
         // Final destination of the train, remove Centrale, format nicely
         destination: train.destinazione.split(' ')[0],
         // Scheduled departure time, formatted as "HH:mm"
