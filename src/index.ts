@@ -77,11 +77,11 @@ const getWeather = async (city: string) => {
     );
 
     const { temp } = response.data.main;
-    // const weatherDescription = response.data.weather[0].description;
+    const weatherDescription = response.data.weather[0].description;
 
     const weatherData = {
       temperature: `${round(temp, 1)}^C`, // Round to 1 decimal place
-      // description: weatherDescription,
+      description: weatherDescription,
     };
 
     // Cache for 5 minutes (300 seconds)
