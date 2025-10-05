@@ -1,12 +1,29 @@
 import axios, { isAxiosError } from 'axios';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import { cleanEnv, port, str } from 'envalid';
 import express from 'express';
 import { isArray, isEmpty, round, take, toInteger } from 'lodash';
 import NodeCache from 'node-cache';
 
+// Load environment variables from .env file
+dotenv.config();
+
+// Validate and clean environment variables
+const env = cleanEnv(process.env, {
+  NODE_ENV: str({
+    choices: ['development', 'production', 'test'],
+    default: 'development',
+  }),
+  OPENWEATHER_API_KEY: str(),
+  PORT: port({ default: 3000 }),
+  API_KEY: str({ default: '' }),
+});
+
+// Create a cache instance
 const cache = new NodeCache();
 
+// Define the Departure type
 type Departure = {
   type: string;
   destination: string;
@@ -14,12 +31,8 @@ type Departure = {
   delay: string;
 };
 
-// Load environment variables from .env file
-dotenv.config();
-
 // Initialize the Express app
 const app = express();
-const PORT = process.env.PORT || 3000;
 
 // Use middlewares
 app.use(cors()); // Enable Cross-Origin Resource Sharing
@@ -38,6 +51,30 @@ const formatTime = (timestamp: number, includeSeconds = false) => {
   });
 };
 
+/**
+ * Middleware to check API key if it's configured.
+ * If API_KEY is set in environment variables, validates the 'key' query parameter.
+ */
+const checkApiKey: express.RequestHandler = (req, res, next) => {
+  // If no API key is configured, skip the check
+  if (!env.API_KEY) {
+    return next();
+  }
+
+  const { key } = req.query;
+
+  // Check if the provided key matches the configured API key
+  if (key !== env.API_KEY) {
+    return res.status(401).json({ error: 'Invalid or missing API key.' });
+  }
+
+  next();
+};
+
+/**
+ * Fetch weather data for a given city using OpenWeather API.
+ * Caches the result for 5 minutes to reduce API calls.
+ */
 const getWeather = async (city: string) => {
   // Check cache first (5 minutes TTL)
   const cacheKey = `weather_${city}`;
@@ -95,7 +132,7 @@ const getWeather = async (city: string) => {
 // Example: /departures/S01700 (for Bologna Centrale)
 // Optional query parameter: limit (number of trains to return)
 // Example: /departures/S01700?limit=5
-app.get('/departures/:stationCode', async (req, res) => {
+app.get('/departures/:stationCode', checkApiKey, async (req, res) => {
   const { stationCode } = req.params;
   const { limit } = req.query;
 
@@ -205,6 +242,6 @@ app.get('/', (_req, res) => {
 });
 
 // Start the server
-app.listen(PORT, () => {
-  console.log(`Server is listening on http://localhost:${PORT}`);
+app.listen(env.PORT, () => {
+  console.log(`Server is listening on http://localhost:${env.PORT}`);
 });

@@ -13,7 +13,7 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "packageManager": "pnpm@10.17.0",
+  "packageManager": "pnpm@10.18.0",
   "devDependencies": {
     "@biomejs/biome": "^2.2.5",
     "@types/cors": "^2.8.19",
@@ -30,6 +30,7 @@
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "dotenv-safe": "^9.1.0",
+    "envalid": "^8.1.0",
     "express": "^5.1.0",
     "lodash": "^4.17.21",
     "node-cache": "^5.1.2"
