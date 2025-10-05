@@ -29,10 +29,11 @@ app.use(express.json()); // To parse JSON bodies
  * Helper function to format a timestamp into a "HH:mm" string.
  * This is useful for display on small screens.
  */
-const formatTime = (timestamp: number) => {
+const formatTime = (timestamp: number, includeSeconds = false) => {
   return new Date(timestamp).toLocaleTimeString('it-IT', {
     hour: '2-digit',
     minute: '2-digit',
+    second: includeSeconds ? '2-digit' : undefined,
     timeZone: 'Europe/Rome',
   });
 };
@@ -69,7 +70,8 @@ const getWeather = async (city: string) => {
     const weatherDescription = response.data.weather[0].description;
 
     const weatherData = {
-      temperature: `${round(temp, 1)}^C`, // Round to 1 decimal place
+      // Round to 1 decimal place, use Italian decimal comma
+      temperature: `${round(temp, 1)} °C`.replace('.', ','),
       description: weatherDescription,
     };
 
@@ -169,7 +171,7 @@ app.get('/departures/:stationCode', async (req, res) => {
 
     // Prepare response with full data
     const response = {
-      time: formatTime(Date.now()),
+      time: formatTime(Date.now(), true),
       weather: await getWeather('Bologna'),
       departures: simplifiedTrains,
     };
