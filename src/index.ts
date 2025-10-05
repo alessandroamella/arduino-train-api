@@ -71,7 +71,7 @@ const getWeather = async (city: string) => {
 
     const weatherData = {
       // Round to 1 decimal place, use Italian decimal comma
-      temperature: `${round(temp, 1)} °C`.replace('.', ','),
+      temperature: `${round(temp, 1)}°C`.replace('.', ','),
       description: weatherDescription,
     };
 
