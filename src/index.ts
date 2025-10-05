@@ -31,6 +31,60 @@ type Departure = {
   delay: string;
 };
 
+const viaggiatrenoUrlBase =
+  'https://www.viaggiatreno.it/infomobilita/resteasy/viaggiatreno';
+
+/**
+ * Fetch station name for a given station code.
+ * First fetches the region, then fetches station details.
+ * Caches the result for 24 hours since station names don't change.
+ */
+const getStationName = async (stationCode: string): Promise<string> => {
+  // Check cache first (24 hours TTL)
+  const cacheKey = `station_name_${stationCode}`;
+  const cachedName = cache.get<string>(cacheKey);
+
+  if (cachedName) {
+    console.log(`Using cached station name for ${stationCode}`);
+    return cachedName;
+  }
+
+  try {
+    // First, fetch the region
+    const regionURL = `${viaggiatrenoUrlBase}/regione/${stationCode}`;
+    const { data: region } = await axios.get<string>(regionURL);
+
+    console.log(`Fetched region for ${stationCode}: ${region}`);
+
+    if (!region || (typeof region !== 'string' && typeof region !== 'number')) {
+      throw new Error('Invalid region data received');
+    }
+
+    // Then, fetch the station details
+    const detailsURL = `${viaggiatrenoUrlBase}/dettaglioStazione/${stationCode}/${region.toString().trim()}`;
+    const { data: stationDetails } = await axios.get(detailsURL);
+
+    const stationName = stationDetails?.localita?.nomeLungo;
+
+    if (!stationName || typeof stationName !== 'string') {
+      throw new Error('Station name not found in response');
+    }
+
+    // Cache for 24 hours (86400 seconds)
+    cache.set(cacheKey, stationName, 86400);
+    console.log(`Cached station name for ${stationCode}: ${stationName}`);
+
+    return stationName;
+  } catch (error) {
+    console.error(
+      'Error fetching station name:',
+      isAxiosError(error) ? error?.response?.data : error,
+    );
+    // Return station code as fallback
+    return stationCode;
+  }
+};
+
 // Initialize the Express app
 const app = express();
 
@@ -151,6 +205,7 @@ app.get('/departures/:stationCode', checkApiKey, async (req, res) => {
   // Check cache first (1 minute TTL)
   const cacheKey = `departures_${stationCode}`;
   const cachedDepartures = cache.get<{
+    stationName: string;
     weather: { temperature: string };
     departures: Departure[];
   }>(cacheKey);
@@ -168,15 +223,12 @@ app.get('/departures/:stationCode', checkApiKey, async (req, res) => {
     });
   }
 
-  // The API URL used in your original code to get the departure board
-  const viaggiatrenoURL = `http://www.viaggiatreno.it/infomobilita/resteasy/viaggiatreno/partenze/${stationCode}/${new Date()}`;
-
-  console.log(
-    `Fetching departures for station: ${stationCode}, URL: ${viaggiatrenoURL}`,
-  );
+  console.log(`Fetching departures for station: ${stationCode}`);
 
   try {
     // Make the request to the Viaggiatreno API
+    const viaggiatrenoURL = `${viaggiatrenoUrlBase}/partenze/${stationCode}/${new Date()}`;
+    console.log(`Requesting URL: ${viaggiatrenoURL}`);
     const { data: rawTrains } = await axios.get(viaggiatrenoURL);
 
     // Check if the response is a valid array
@@ -188,10 +240,10 @@ app.get('/departures/:stationCode', checkApiKey, async (req, res) => {
 
     // Process the raw data to create the simple JSON format for the Arduino
     const simplifiedTrains: Departure[] = rawTrains
-      .filter(
-        // solo treni che devono ancora partire
-        (e) => e.orarioPartenza >= Date.now(),
-      )
+      // opzionalmente, filtra solo treni che devono ancora partire
+      // .filter(
+      //   (e) => e.orarioPartenza >= Date.now(),
+      // )
       .map((train) => ({
         // Type and number, e.g., "REG 12345"
         type: train.compNumeroTreno.replace('REG', 'R'),
@@ -206,8 +258,13 @@ app.get('/departures/:stationCode', checkApiKey, async (req, res) => {
         ).toString(),
       }));
 
+    console.log(
+      `Fetched ${simplifiedTrains.length} departures for station: ${stationCode}`,
+    );
+
     // Prepare response with full data (without time, which will be added fresh)
     const response = {
+      stationName: await getStationName(stationCode),
       weather: await getWeather('Bologna'),
       departures: simplifiedTrains,
     };
