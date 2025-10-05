@@ -2,18 +2,7 @@ import axios, { isAxiosError } from 'axios';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import express from 'express';
-import {
-  filter,
-  includes,
-  isArray,
-  isEmpty,
-  round,
-  startCase,
-  take,
-  toInteger,
-  toUpper,
-  trim,
-} from 'lodash';
+import { isArray, isEmpty, round, take, toInteger } from 'lodash';
 import NodeCache from 'node-cache';
 
 const cache = new NodeCache();
@@ -125,8 +114,7 @@ app.get('/departures/:stationCode', async (req, res) => {
   const cachedDepartures = cache.get<{
     time: string | null;
     weather: { temperature: string };
-    toModena: Departure[];
-    toBologna: Departure[];
+    departures: Departure[];
   }>(cacheKey);
 
   if (cachedDepartures) {
@@ -134,14 +122,10 @@ app.get('/departures/:stationCode', async (req, res) => {
     // Apply limit if specified
     return res.status(200).json({
       ...cachedDepartures,
-      toModena:
+      departures:
         maxResults > 0
-          ? take(cachedDepartures.toModena, maxResults)
-          : cachedDepartures.toModena,
-      toBologna:
-        maxResults > 0
-          ? take(cachedDepartures.toBologna, maxResults)
-          : cachedDepartures.toBologna,
+          ? take(cachedDepartures.departures, maxResults)
+          : cachedDepartures.departures,
     });
   }
 
@@ -163,18 +147,6 @@ app.get('/departures/:stationCode', async (req, res) => {
       return res.json([]); // Return an empty array for simplicity
     }
 
-    // Define destination groups
-    const destinationGroups = {
-      toModena: [
-        'MILANO CENTRALE',
-        'MODENA',
-        'GENOVA BRIGNOLE',
-        'PARMA',
-        'PIACENZA',
-      ],
-      toBologna: ['BOLOGNA CENTRALE', 'ANCONA', 'RIMINI', 'PESARO'],
-    };
-
     // Process the raw data to create the simple JSON format for the Arduino
     const simplifiedTrains: Departure[] = rawTrains
       .filter(
@@ -185,7 +157,7 @@ app.get('/departures/:stationCode', async (req, res) => {
         // Type and number, e.g., "REG 12345"
         type: train.compNumeroTreno,
         // Final destination of the train, remove Centrale, format nicely
-        destination: startCase(train.destinazione.toLowerCase()).split(' ')[0],
+        destination: train.destinazione.split(' ')[0],
         // Scheduled departure time, formatted as "HH:mm"
         departureTime: formatTime(train.orarioPartenza),
         // Current delay in minutes
@@ -195,21 +167,11 @@ app.get('/departures/:stationCode', async (req, res) => {
         ).toString(),
       }));
 
-    // Separate trains by direction using groupBy or partition
-    const filterByDestinations = (destinations: string[]) =>
-      filter(simplifiedTrains, (train) =>
-        includes(destinations, toUpper(trim(train.destination))),
-      );
-
-    const trainsToModena = filterByDestinations(destinationGroups.toModena);
-    const trainsToBologna = filterByDestinations(destinationGroups.toBologna);
-
     // Prepare response with full data
     const response = {
       time: formatTime(Date.now()),
       weather: await getWeather('Bologna'),
-      toModena: trainsToModena,
-      toBologna: trainsToBologna,
+      departures: simplifiedTrains,
     };
 
     // Cache for 1 minute (60 seconds)
@@ -219,10 +181,8 @@ app.get('/departures/:stationCode', async (req, res) => {
     // Apply limit if specified and send response
     return res.status(200).json({
       ...response,
-      toModena:
-        maxResults > 0 ? take(trainsToModena, maxResults) : trainsToModena,
-      toBologna:
-        maxResults > 0 ? take(trainsToBologna, maxResults) : trainsToBologna,
+      departures:
+        maxResults > 0 ? take(simplifiedTrains, maxResults) : simplifiedTrains,
     });
   } catch (error) {
     console.error(
